@@ -2,33 +2,36 @@ const express = require('express')
 const multer = require('multer')
 const fs = require('fs')
 const path = require('path')
+const { v4: uuidv4, validate: uuidValidate } = require('uuid');
+
+
 require('dotenv').config()
-
-const { v4: uuidv4, validate:uuidValidate  } = require('uuid');
-
 const upload = multer()
-
 const app = express()
+const process = require('./process.mjs')
 
 function saveUID(uid) {
-    fs.appendFileSync(path.join(__dirname, "alluids"),uid+"\n")
+    fs.appendFileSync(path.join(__dirname, "alluids"), uid + "\n")
 }
+
 
 
 //send new uid to frontend and create a folder of that uid on the server
 app.get('/uid', function (req, res, next) {
     try {
+        // #Creating the data
         const uid = uuidv4()
+        const directoryPath = path.join(__dirname, "uploads", uid)
 
-        fs.mkdir(path.join(__dirname, "uploads",uid), error => {
-            if (error) {
-                console.error(error);
-                res.status(500).send("Unable to create directory")
-            }
-            saveUID(uid)
-            console.log('Directory created successfully!');
-            res.send(uid)
-        });
+
+        // #Creating directory and saving its name in file
+        fs.mkdirSync(directoryPath)
+        saveUID(uid)
+        console.log('Directory created successfully!');
+        
+        
+        res.send(uid)
+
     }
 
     catch (error) {
@@ -38,54 +41,77 @@ app.get('/uid', function (req, res, next) {
 })
 
 
+app.post('/process/:uid', function (req, res) {
+    try {
+        const { uid } = req.params
+
+        if (!uid) res.status(400).send("Provide uid")
+        process(uid)
+
+        res.send("Processing started")
+
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).send()
+    }
+})
 
 //save the file in this path
 app.post('/upload/:uid/:fileId', upload.single('file'), function (req, res, next) {
     try {
-        //qweruuj-983uuj
+        // #Reading required data
         const { uid, fileId } = req.params
-
-        if (!uid || !fileId) res.status(400).send("Provide uid and fileid")
-        // console.log(uuidv4);
-        if (!uuidValidate(uid)) res.status(400).send("Provide valid uid")
-
-        // console.log(req, req.body.someName);
-
         const file = req.file
         const fileName = req.body.fileName
 
-        //check if file exhist or not
+        // #Checks
+        if (!uid || !fileId) res.status(400).send("Provide uid and fileid")
+        if (!uuidValidate(uid)) res.status(400).send("Provide valid uid")
         if (!file) res.status(400).send("Provide file")
         if (!fileName) res.status(400).send("Provide file name")
-        
-        //save file
+
+
+        //#Saving file
         const pathToSave = path.join(__dirname, "uploads", uid, fileName)
-        
-        console.log(file);
-        console.log({ uid, pathToSave });
+        console.log({ file,uid, pathToSave });
+        fs.writeFileSync(pathToSave,file.buffer)
 
-        fs.writeFileSync(pathToSave,JSON.stringify(file))
+
         res.send("File uploaded successfully")
-    
-    }
-  
-    catch (error) { 
-        console.log(error);
-        res.status(500).send()
-    }
-})
 
-
-//temporary function
-app.get('/alluid', function (req, res, next) {
-    try {
-        const file = fs.readFileSync('alluids')
-        res.json(file.toString())
     }
     catch (error) {
         console.log(error);
         res.status(500).send()
     }
+})
+
+//to get the report
+app.get('/report/:uid', function (req, res) {
+    try {
+        const { uid } = req.params
+
+        if (!uid) res.status(400).send("Provide uid")
+
+        //check for uid in reports folder
+        const doesUIDExhist = fs.existsSync(path.join(__dirname,"reports",uid))
+        if (!doesUIDExhist) res.send("UID does not exhist")
+        
+        //if folder is present
+        //check for report
+        const isReportReady = fs.existsSync(path.join(__dirname, "reports", uid, 'report'))
+        if (!isReportReady) res.send("Report not ready") 
+
+        //send report
+        const report = fs.readFileSync(path.join(__dirname, "reports", uid, 'report'))
+        res.send(report)
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).send()
+    }
+
 })
 
 
