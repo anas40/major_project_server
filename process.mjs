@@ -24,6 +24,7 @@ async function readTextFromBuffer(allFileNames, uid) {
     return processedTextFiles
 }
 
+
 async function fetchPairWiseResult(processedTextFiles, uid) {
     const pairResults = []
 
@@ -39,8 +40,7 @@ async function fetchPairWiseResult(processedTextFiles, uid) {
                 headers: { 'Content-Type': 'application/json' }
             })
 
-            const result = await response.text()
-            
+            const result = await response.json()
             pairResults.push({
                 fileFirst: processedTextFiles[i].file,
                 fileSecond: processedTextFiles[j].file,
@@ -52,6 +52,7 @@ async function fetchPairWiseResult(processedTextFiles, uid) {
     return pairResults
 }
 
+
 async function processPDF(uid) {
     try {
         //read all files
@@ -59,18 +60,19 @@ async function processPDF(uid) {
         console.log("All files : ",allFileNames);
         
         const processedTextFiles = await readTextFromBuffer(allFileNames, uid)
-
         const pairResults = await fetchPairWiseResult(processedTextFiles, uid)
 
+        console.log(pairResults);
         //set the result in reports
-        //todo
+        if (!fs.existsSync(path.resolve("reports", uid))) {
+            fs.mkdirSync(path.resolve("reports", uid))
+        }
+        fs.writeFileSync(path.resolve("reports", uid) + "/report.json", JSON.stringify(pairResults))
     }
     catch (error) {
         console.log(error);
     }
 }
 
-
-processPDF('e6e6833c-ad62-4a7a-bc0e-e47dd1ba314a')
 
 export default processPDF
